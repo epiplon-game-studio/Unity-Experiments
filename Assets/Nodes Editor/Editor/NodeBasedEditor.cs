@@ -1,11 +1,15 @@
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 
 namespace vnc.Editor.Experimental
 {
-    public class NodeBasedEditor : EditorWindow
+    public partial class NodeBasedEditor : EditorWindow
     {
+        private Blackboard selectedBlackboard = null;
+        ReorderableList parametersList;
+
         private List<Node> nodes;
         private List<Connection> connections;
 
@@ -21,8 +25,12 @@ namespace vnc.Editor.Experimental
         private Vector2 drag;
         private Vector2 offset;
 
+        private const float PANEL_WIDTH = 250f;
+
+        private Rect nodeArea { get { return new Rect(PANEL_WIDTH, 0, position.width - PANEL_WIDTH, position.height); } }
+
         [MenuItem("Window/Node Based Editor")]
-        private static void OpenWindow()
+        public static void OpenWindow()
         {
             NodeBasedEditor window = GetWindow<NodeBasedEditor>();
             window.titleContent = new GUIContent("Node Editor");
@@ -51,11 +59,13 @@ namespace vnc.Editor.Experimental
             backgroundStyle = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             backgroundStyle.SetPixel(0, 0, new Color(0.15f, 0.15f, 0.15f));
             backgroundStyle.Apply();
+
+            Selection.selectionChanged = ProcessBlackboard;
+            ProcessBlackboard();
         }
 
         private void OnGUI()
         {
-            //EditorGUIUtility.DrawColorSwatch(new Rect(0,0,position.width, position.height), Color.black);
             GUI.DrawTexture(new Rect(0, 0, position.width, position.height), backgroundStyle, ScaleMode.StretchToFill);
             DrawGrid(20, 0.2f, Color.grey);
             DrawGrid(100, 0.4f, Color.black);
@@ -63,6 +73,7 @@ namespace vnc.Editor.Experimental
             DrawNodes();
             DrawConnections();
             DrawConnectionLine(Event.current);
+            DrawPanel();
 
             ProcessNodeEvents(Event.current);
             ProcessEvents(Event.current);
@@ -71,110 +82,56 @@ namespace vnc.Editor.Experimental
                 Repaint();
         }
 
-        private void DrawNodes()
+        private void ProcessBlackboard()
         {
-            if (nodes != null)
+            Blackboard blackboard = Selection.activeObject as Blackboard;
+            if (blackboard != null)
             {
-                foreach (var node in nodes)
+                selectedBlackboard = blackboard;
+                parametersList = new ReorderableList(selectedBlackboard.Parameters, typeof(Parameter), true, true, true, true);
+                parametersList.drawHeaderCallback = (Rect rect) => {
+                    EditorGUI.LabelField(rect, "Parameters");
+                };
+                parametersList.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
                 {
-                    node.Draw();
-                }
+                    var param = (Parameter)parametersList.list[index];
+                    rect.y += 2;
+
+                    param.Name = EditorGUI.TextField(new Rect(rect.x, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight), param.Name);
+                    param.Type = (ParameterType)EditorGUI.EnumPopup(new Rect(rect.x + (rect.width / 2), rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight), param.Type);
+                };
+                parametersList.displayRemove = true;
+                Repaint();
             }
-        }
-
-        private void DrawConnections()
-        {
-            if (connections != null)
-            {
-                for (int i = 0; i < connections.Count; i++)
-                {
-                    connections[i].Draw();
-                }
-            }
-        }
-
-        private void DrawConnectionLine(Event e)
-        {
-            if (selectedInPoint != null && selectedOutPoint == null)
-            {
-                Handles.DrawBezier(
-                    selectedInPoint.rect.center,
-                    e.mousePosition,
-                    selectedInPoint.rect.center + Vector2.left * 50f,
-                    e.mousePosition - Vector2.left * 50f,
-                    Color.white,
-                    null,
-                    2f
-                );
-
-                GUI.changed = true;
-            }
-
-            if (selectedOutPoint != null && selectedInPoint == null)
-            {
-                Handles.DrawBezier(
-                    selectedOutPoint.rect.center,
-                    e.mousePosition,
-                    selectedOutPoint.rect.center - Vector2.left * 50f,
-                    e.mousePosition + Vector2.left * 50f,
-                    Color.white,
-                    null,
-                    2f
-                );
-
-                GUI.changed = true;
-            }
-        }
-
-        private void DrawGrid(float gridSpacing, float gridOpacity, Color gridColor)
-        {
-            int widthDivs = Mathf.CeilToInt(position.width / gridSpacing);
-            int heightDivs = Mathf.CeilToInt(position.height / gridSpacing);
-
-            Handles.BeginGUI();
-            Handles.color = new Color(gridColor.r, gridColor.g, gridColor.b, gridOpacity);
-
-            offset += drag * 0.5f;
-            Vector3 newOffset = new Vector3(offset.x % gridSpacing, offset.y % gridSpacing, 0);
-
-            for (int i = 0; i < widthDivs; i++)
-            {
-                Handles.DrawLine(new Vector3(gridSpacing * i, -gridSpacing, 0) + newOffset, new Vector3(gridSpacing * i, position.height, 0f) + newOffset);
-            }
-
-            for (int j = 0; j < heightDivs; j++)
-            {
-                Handles.DrawLine(new Vector3(-gridSpacing, gridSpacing * j, 0) + newOffset, new Vector3(position.width, gridSpacing * j, 0f) + newOffset);
-            }
-
-            Handles.color = Color.white;
-            Handles.EndGUI();
         }
 
         private void ProcessEvents(Event e)
         {
-            drag = Vector2.zero;
-
-            switch (e.type)
+            if (nodeArea.Contains(e.mousePosition))
             {
-                case EventType.MouseDown:
-                    if (e.button == 1)
-                    {
-                        ProcessContextMenu(e.mousePosition);
-                    }
-                    break;
-                case EventType.MouseDrag:
-                    if (e.button == 0)
-                    {
-                        OnDrag(e.delta);
-                    }
-                    break;
+                drag = Vector2.zero;
+
+                switch (e.type)
+                {
+                    case EventType.MouseDown:
+                        if (e.button == 1)
+                        {
+                            ProcessContextMenu(e.mousePosition);
+                        }
+                        break;
+                    case EventType.MouseDrag:
+                        if (e.button == 0)
+                        {
+                            OnDrag(e.delta);
+                        }
+                        break;
+                }
             }
         }
 
         private void ProcessNodeEvents(Event e)
         {
-            if (nodes != null)
+            if (nodes != null && nodeArea.Contains(e.mousePosition))
             {
                 for (int i = nodes.Count - 1; i >= 0; i--)
                 {
@@ -287,9 +244,7 @@ namespace vnc.Editor.Experimental
         private void CreateConnection()
         {
             if (connections == null)
-            {
                 connections = new List<Connection>();
-            }
 
             connections.Add(new Connection(selectedInPoint, selectedOutPoint, OnClickRemoveConnection));
         }
@@ -298,6 +253,17 @@ namespace vnc.Editor.Experimental
         {
             selectedInPoint = null;
             selectedOutPoint = null;
+        }
+
+        [UnityEditor.Callbacks.OnOpenAsset(1)]
+        public static bool OnOpenAsset(int instanceID, int line)
+        {
+            if (Selection.activeObject as Blackboard != null)
+            {
+                NodeBasedEditor.OpenWindow();
+                return true;
+            }
+            return false;
         }
     }
 }
