@@ -1,20 +1,18 @@
-using System;
 using UnityEditor;
 using UnityEngine;
 
 namespace vnc.Editor.Experimental
 {
+    [System.Serializable]
     public class Connection
     {
         public ConnectionPoint inPoint;
         public ConnectionPoint outPoint;
-        public Action<Connection> OnClickRemoveConnection;
 
-        public Connection(ConnectionPoint inPoint, ConnectionPoint outPoint, Action<Connection> onClickRemove)
+        public Connection(ConnectionPoint inPoint, ConnectionPoint outPoint)
         {
             this.inPoint = inPoint;
             this.outPoint = outPoint;
-            OnClickRemoveConnection = onClickRemove;
         }
 
         public void Draw()
@@ -30,10 +28,7 @@ namespace vnc.Editor.Experimental
 
             if (Handles.Button((inPoint.rect.center + outPoint.rect.center) * 0.5f, Quaternion.identity, 4, 8, Handles.RectangleHandleCap))
             {
-                if (OnClickRemoveConnection != null)
-                {
-                    OnClickRemoveConnection(this);
-                }
+                NodeBasedEditor.OnClickRemoveConnection(this);
             }
         }
     }

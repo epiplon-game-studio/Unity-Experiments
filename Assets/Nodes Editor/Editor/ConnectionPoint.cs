@@ -3,22 +3,21 @@ using UnityEngine;
 
 namespace vnc.Editor.Experimental
 {
+    [System.Serializable]
     public enum ConnectionPointType { In, Out }
 
+    [System.Serializable]
     public class ConnectionPoint
     {
         public Rect rect;
         public ConnectionPointType type;
         public Node node;
-        public GUIStyle style;
-        public Action<ConnectionPoint> OnClickConnectionPoint;
+        [NonSerialized] public GUIStyle style;
 
-        public ConnectionPoint(Node node, ConnectionPointType type, GUIStyle style, Action<ConnectionPoint> onClick)
+        public ConnectionPoint(Node node, ConnectionPointType type)
         {
             this.node = node;
             this.type = type;
-            this.style = style;
-            OnClickConnectionPoint = onClick;
             rect = new Rect(0, 0, 10f, 20f);
         }
 
@@ -30,12 +29,9 @@ namespace vnc.Editor.Experimental
             {
                 case ConnectionPointType.In:
                     rect.x = node.rect.x - rect.width + 8f;
-                    if (GUI.Button(rect, "", style))
+                    if (GUI.Button(rect, "", NodeBasedEditor.inPointStyle))
                     {
-                        if (OnClickConnectionPoint != null)
-                        {
-                            OnClickConnectionPoint(this);
-                        }
+                        NodeBasedEditor.OnClickInPoint(this);
                     }
                     break;
 

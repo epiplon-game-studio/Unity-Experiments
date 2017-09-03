@@ -13,9 +13,8 @@ namespace vnc.Editor.Experimental
             GUILayout.BeginArea(new Rect(0, 0, PANEL_WIDTH, position.height), GUI.skin.box);
             if(selectedBlackboard != null)
             {
-                var title = string.IsNullOrEmpty(selectedBlackboard.Title) ? "(empty)" : selectedBlackboard.Title;
-                selectedBlackboard.Title = EditorGUILayout.TextField("Name", selectedBlackboard.Title, EditorStyles.boldLabel);
-                selectedBlackboard.Update = (AnimatorUpdateMode) EditorGUILayout.EnumPopup("Update", selectedBlackboard.Update);
+                selectedBlackboard.Title = EditorGUILayout.TextField("Name", selectedBlackboard.Title, EditorStyles.textField);
+                //selectedBlackboard.Update = (AnimatorUpdateMode) EditorGUILayout.EnumPopup("Update", selectedBlackboard.Update);
                 DrawParameters();
             }
             GUILayout.EndArea();
@@ -31,9 +30,9 @@ namespace vnc.Editor.Experimental
 
         private void DrawNodes()
         {
-            if (nodes != null)
+            if (selectedBlackboard != null)
             {
-                foreach (var node in nodes)
+                foreach (var node in selectedBlackboard.nodes)
                 {
                     node.Draw();
                 }
@@ -42,11 +41,11 @@ namespace vnc.Editor.Experimental
 
         private void DrawConnections()
         {
-            if (connections != null)
+            if (singleton.selectedBlackboard.connections != null)
             {
-                for (int i = 0; i < connections.Count; i++)
+                for (int i = 0; i < singleton.selectedBlackboard.connections.Count; i++)
                 {
-                    connections[i].Draw();
+                    singleton.selectedBlackboard.connections[i].Draw();
                 }
             }
         }

@@ -4,59 +4,46 @@ using UnityEngine;
 
 namespace vnc.Editor.Experimental
 {
-    public class Node
-    {
-        public Rect rect;
-        public string title;
-        public bool isDragged;
-        public bool isSelected;
+	[Serializable]
+	public class Node
+	{
+		public string title;
+		public Rect rect;
+		public bool isDragged;
+		public bool isSelected;
 
-        public ConnectionPoint inPoint;
-        public ConnectionPoint outPoint;
+        public Behaviour behaviour;
 
-        public GUIStyle style;
-        public GUIStyle defaultNodeStyle;
-        public GUIStyle selectedNodeStyle;
+		public ConnectionPoint inPoint;
+		public ConnectionPoint outPoint;
 
-        public Action<Node> OnRemoveNode;
-        public Action<ConnectionPoint> OnClickInPoint;
-        public Action<ConnectionPoint> OnClickOutPoint;
-        public Action OnClearConnectionSelection;
+		[NonSerialized]
+		public GUIStyle style;
 
-        public Node(Vector2 position, float width, float height, 
-            GUIStyle nodeStyle, GUIStyle selectedStyle, GUIStyle inPointStyle, GUIStyle outPointStyle, 
-            Action<ConnectionPoint> OnClickInPoint, 
-            Action<ConnectionPoint> OnClickOutPoint, 
-            Action<Node> OnClickRemoveNode,
-            Action OnClearConnectionSelection)
-        {
-            rect = new Rect(position.x, position.y, width, height);
-            style = nodeStyle;
-            inPoint = new ConnectionPoint(this, ConnectionPointType.In, inPointStyle, OnClickInPoint);
-            outPoint = new ConnectionPoint(this, ConnectionPointType.Out, outPointStyle, OnClickOutPoint);
-            this.OnClickOutPoint = OnClickOutPoint;
-            this.OnClickInPoint = OnClickInPoint;
-            this.OnRemoveNode = OnClickRemoveNode;
-            this.OnClearConnectionSelection = OnClearConnectionSelection;
+		public Node(Vector2 position, float width, float height)
+		{
+			this.rect = new Rect(position.x, position.y, width, height);
+			this.inPoint = new ConnectionPoint(this, ConnectionPointType.In);
+			this.outPoint = new ConnectionPoint(this, ConnectionPointType.Out);
+			this.style = NodeBasedEditor.nodeStyle;
+		}
 
-            defaultNodeStyle = nodeStyle;
-            selectedNodeStyle = selectedStyle;
-        }
-
-        public void Drag(Vector2 delta)
-        {
+		public void Drag(Vector2 delta)
+		{
             rect.position += delta;
-        }
+		}
 
-        public void Draw()
-        {
-            inPoint.Draw();
-            outPoint.Draw();
+		public void Draw()
+		{
+			inPoint.Draw();
+			outPoint.Draw();
+			style = (!isSelected ? NodeBasedEditor.nodeStyle : NodeBasedEditor.selectedNodeStyle);
             GUI.Box(rect, title, style);
-        }
+		}
 
-        public bool ProcessEvents(Event e)
-        {
+		public bool ProcessEvents(Event e)
+		{
+            EventType type = e.type;
             switch (e.type)
             {
                 case EventType.MouseDown:
@@ -66,13 +53,11 @@ namespace vnc.Editor.Experimental
                         {
                             isDragged = true;
                             isSelected = true;
-                            style = selectedNodeStyle;
                         }
                         else
                         {
                             isSelected = false;
-                            style = defaultNodeStyle;
-                            OnClearConnectionSelection();
+                            NodeBasedEditor.OnClearConnectionSelection();
                         }
                         GUI.changed = true;
                     }
@@ -82,42 +67,36 @@ namespace vnc.Editor.Experimental
                         e.Use();
                     }
                     break;
-
                 case EventType.MouseUp:
                     isDragged = false;
                     break;
-
                 case EventType.MouseDrag:
-                    if (e.button == 0 && isDragged)
+                    if (e.button == 0 && this.isDragged)
                     {
                         Drag(e.delta);
                         e.Use();
-                        return true;
                     }
                     break;
             }
-            return false;
-        }
+            return true;
+		}
 
-        private void ProcessContextMenu()
-        {
-            GenericMenu genericMenu = new GenericMenu();
-            genericMenu.AddItem(new GUIContent("Connect"), false, OnClickConnect);
-            genericMenu.AddItem(new GUIContent("Remove node"), false, OnClickRemoveNode);
-            genericMenu.ShowAsContext();
-        }
+		private void ProcessContextMenu()
+		{
+			GenericMenu genericMenu = new GenericMenu();
+			genericMenu.AddItem(new GUIContent("Connect"), false, new GenericMenu.MenuFunction(this.OnClickConnect));
+			genericMenu.AddItem(new GUIContent("Remove node"), false, new GenericMenu.MenuFunction(this.OnClickRemoveNode));
+			genericMenu.ShowAsContext();
+		}
 
-        private void OnClickConnect()
-        {
-            OnClickOutPoint(outPoint);
-        }
+		private void OnClickConnect()
+		{
+			NodeBasedEditor.OnClickOutPoint(this.outPoint);
+		}
 
-        private void OnClickRemoveNode()
-        {
-            if (OnRemoveNode != null)
-            {
-                OnRemoveNode(this);
-            }
-        }
-    }
+		private void OnClickRemoveNode()
+		{
+			NodeBasedEditor.OnClickRemoveNode(this);
+		}
+	}
 }

@@ -7,17 +7,16 @@ namespace vnc.Editor.Experimental
 {
     public partial class NodeBasedEditor : EditorWindow
     {
+        private static NodeBasedEditor singleton;
+
         private Blackboard selectedBlackboard = null;
         ReorderableList parametersList;
-
-        private List<Node> nodes;
-        private List<Connection> connections;
-
-        private GUIStyle nodeStyle;
-        private GUIStyle selectedNodeStyle;
-        private GUIStyle inPointStyle;
-        private GUIStyle outPointStyle;
-        private Texture2D backgroundStyle;
+        
+        public static GUIStyle nodeStyle { get; private set; }
+        public static GUIStyle selectedNodeStyle { get; private set; }
+        public static GUIStyle inPointStyle { get; private set; }
+        public static GUIStyle outPointStyle { get; private set; }
+        public static Texture2D backgroundStyle { get; private set; }
 
         private ConnectionPoint selectedInPoint;
         private ConnectionPoint selectedOutPoint;
@@ -38,6 +37,8 @@ namespace vnc.Editor.Experimental
 
         private void OnEnable()
         {
+            singleton = this;
+
             nodeStyle = new GUIStyle();
             nodeStyle.normal.background = EditorGUIUtility.Load("builtin skins/darkskin/images/node1.png") as Texture2D;
             nodeStyle.border = new RectOffset(12, 12, 12, 12);
@@ -89,7 +90,8 @@ namespace vnc.Editor.Experimental
             {
                 selectedBlackboard = blackboard;
                 parametersList = new ReorderableList(selectedBlackboard.Parameters, typeof(Parameter), true, true, true, true);
-                parametersList.drawHeaderCallback = (Rect rect) => {
+                parametersList.drawHeaderCallback = (Rect rect) =>
+                {
                     EditorGUI.LabelField(rect, "Parameters");
                 };
                 parametersList.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
@@ -105,45 +107,6 @@ namespace vnc.Editor.Experimental
             }
         }
 
-        private void ProcessEvents(Event e)
-        {
-            if (nodeArea.Contains(e.mousePosition))
-            {
-                drag = Vector2.zero;
-
-                switch (e.type)
-                {
-                    case EventType.MouseDown:
-                        if (e.button == 1)
-                        {
-                            ProcessContextMenu(e.mousePosition);
-                        }
-                        break;
-                    case EventType.MouseDrag:
-                        if (e.button == 0)
-                        {
-                            OnDrag(e.delta);
-                        }
-                        break;
-                }
-            }
-        }
-
-        private void ProcessNodeEvents(Event e)
-        {
-            if (nodes != null && nodeArea.Contains(e.mousePosition))
-            {
-                for (int i = nodes.Count - 1; i >= 0; i--)
-                {
-                    bool guiChanged = nodes[i].ProcessEvents(e);
-                    if (guiChanged)
-                    {
-                        GUI.changed = true;
-                    }
-                }
-            }
-        }
-
         private void ProcessContextMenu(Vector2 mousePosition)
         {
             GenericMenu genericMenu = new GenericMenu();
@@ -153,107 +116,111 @@ namespace vnc.Editor.Experimental
 
         private void OnDrag(Vector2 delta)
         {
-            drag = delta;
-
-            if (nodes != null)
+            if (selectedBlackboard != null)
             {
-                for (int i = 0; i < nodes.Count; i++)
+                drag = delta;
+
+                if (selectedBlackboard.nodes != null)
                 {
-                    nodes[i].Drag(delta);
-                }
-            }
-
-            GUI.changed = true;
-        }
-
-        private void OnClickAddNode(Vector2 mousePosition)
-        {
-            if (nodes == null)
-            {
-                nodes = new List<Node>();
-            }
-
-            nodes.Add(new Node(mousePosition, 200, 50, nodeStyle, selectedNodeStyle, inPointStyle, outPointStyle, OnClickInPoint, OnClickOutPoint, OnClickRemoveNode, ClearConnectionSelection));
-        }
-
-        private void OnClickInPoint(ConnectionPoint inPoint)
-        {
-            if (selectedOutPoint != null)
-            {
-                selectedInPoint = inPoint;
-                if (selectedOutPoint.node != selectedInPoint.node)
-                {
-                    CreateConnection();
-                    ClearConnectionSelection();
-                }
-                else
-                {
-                    ClearConnectionSelection();
-                }
-            }
-        }
-
-        private void OnClickOutPoint(ConnectionPoint outPoint)
-        {
-            selectedOutPoint = outPoint;
-
-            if (selectedInPoint != null)
-            {
-                if (selectedOutPoint.node != selectedInPoint.node)
-                {
-                    CreateConnection();
-                    ClearConnectionSelection();
-                }
-                else
-                {
-                    ClearConnectionSelection();
-                }
-            }
-        }
-
-        private void OnClickRemoveConnection(Connection connection)
-        {
-            connections.Remove(connection);
-        }
-
-        private void OnClickRemoveNode(Node node)
-        {
-            if (connections != null)
-            {
-                List<Connection> connectionsToRemove = new List<Connection>();
-
-                for (int i = 0; i < connections.Count; i++)
-                {
-                    if (connections[i].inPoint == node.inPoint || connections[i].outPoint == node.outPoint)
+                    for (int i = 0; i < selectedBlackboard.nodes.Count; i++)
                     {
-                        connectionsToRemove.Add(connections[i]);
+                        selectedBlackboard.nodes[i].Drag(delta);
                     }
                 }
 
-                for (int i = 0; i < connectionsToRemove.Count; i++)
+                GUI.changed = true;
+            }
+        }
+
+        #region Static Actions
+
+        public static void OnClickAddNode(Vector2 mousePosition)
+        {
+            if (singleton.selectedBlackboard != null)
+            {
+                singleton.selectedBlackboard.nodes.Add(new Node(mousePosition, 200, 50));
+            }
+        }
+
+        public static void OnClickInPoint(ConnectionPoint inPoint)
+        {
+            if (singleton.selectedOutPoint != null)
+            {
+                singleton.selectedInPoint = inPoint;
+                if (singleton.selectedOutPoint.node != singleton.selectedInPoint.node)
                 {
-                    connections.Remove(connectionsToRemove[i]);
+                    OnCreateConnection();
+                    OnClearConnectionSelection();
+                }
+                else
+                {
+                    OnClearConnectionSelection();
+                }
+            }
+        }
+
+        public static void OnClickOutPoint(ConnectionPoint outPoint)
+        {
+            singleton.selectedOutPoint = outPoint;
+
+            if (singleton.selectedInPoint != null)
+            {
+                if (singleton.selectedOutPoint.node != singleton.selectedInPoint.node)
+                {
+                    OnCreateConnection();
+                    OnClearConnectionSelection();
+                }
+                else
+                {
+                    OnClearConnectionSelection();
+                }
+            }
+        }
+
+        public static void OnClickRemoveConnection(Connection connection)
+        {
+            singleton.selectedBlackboard.connections.Remove(connection);
+        }
+
+        public static void OnClickRemoveNode(Node node)
+        {
+            if (singleton.selectedBlackboard != null)
+            {
+                if (singleton.selectedBlackboard.connections != null)
+                {
+                    List<Connection> connectionsToRemove = new List<Connection>();
+
+                    for (int i = 0; i < singleton.selectedBlackboard.connections.Count; i++)
+                    {
+                        if (singleton.selectedBlackboard.connections[i].inPoint == node.inPoint || singleton.selectedBlackboard.connections[i].outPoint == node.outPoint)
+                        {
+                            connectionsToRemove.Add(singleton.selectedBlackboard.connections[i]);
+                        }
+                    }
+
+                    for (int i = 0; i < connectionsToRemove.Count; i++)
+                    {
+                        singleton.selectedBlackboard.connections.Remove(connectionsToRemove[i]);
+                    }
+
+                    connectionsToRemove = null;
                 }
 
-                connectionsToRemove = null;
+                singleton.selectedBlackboard.nodes.Remove(node);
             }
-
-            nodes.Remove(node);
         }
 
-        private void CreateConnection()
+        public static void OnCreateConnection()
         {
-            if (connections == null)
-                connections = new List<Connection>();
-
-            connections.Add(new Connection(selectedInPoint, selectedOutPoint, OnClickRemoveConnection));
+            singleton.selectedBlackboard.connections.Add(new Connection(singleton.selectedInPoint, singleton.selectedOutPoint));
         }
 
-        private void ClearConnectionSelection()
+        public static void OnClearConnectionSelection()
         {
-            selectedInPoint = null;
-            selectedOutPoint = null;
+            singleton.selectedInPoint = null;
+            singleton.selectedOutPoint = null;
         }
+        #endregion
 
         [UnityEditor.Callbacks.OnOpenAsset(1)]
         public static bool OnOpenAsset(int instanceID, int line)
